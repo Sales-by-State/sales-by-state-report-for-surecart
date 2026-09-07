@@ -915,7 +915,7 @@
 			} )
 		);
 
-		return el( 'div', { className: 'woocommerce-analytics__report sbssc-report' }, children );
+		return el( 'div', { className: 'sbssc-report' }, children );
 	}
 
 	/**
