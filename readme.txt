@@ -17,11 +17,20 @@ Sales by State Report for SureCart adds a report showing net and gross sales gro
 
 It appears under **SureCart → Sales by State**.
 
-It answers the question sales tax and territory planning actually ask: how much did each state buy in a given year, counting only the orders that matter.
+Use it when you need to know how much each state bought in a given year, counting only the order statuses that matter for sales tax or territory planning.
 
 This plugin requires [SureCart](https://wordpress.org/plugins/surecart/).
 
 Documentation: [salesbystate.com](https://salesbystate.com/)
+
+= How to use =
+
+1. Install and activate SureCart, then install and activate this plugin.
+2. Go to **SureCart → Sales by State**.
+3. Choose a **country**, a **year**, and the **order statuses** that should count.
+4. The table lists Net Sales and Gross Sales for every state in that country.
+
+If the store already has orders, the plugin imports them from the SureCart API into its report table in the background. A progress bar appears until that finishes. You can leave the page; the import continues on its own.
 
 = What the report shows =
 
