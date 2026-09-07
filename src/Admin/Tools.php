@@ -2,14 +2,14 @@
 /**
  * Site Health entries for the report table.
  *
- * @package SalesByStateReportForSureCart
+ * @package SalesByStateReportForShopify
  */
 
-namespace SBSSC\Admin;
+namespace SBSS\Admin;
 
-use SBSSC\Data\Backfill;
-use SBSSC\Install\Schema;
-use SBSSC\Plugin;
+use SBSS\Data\Backfill;
+use SBSS\Install\Schema;
+use SBSS\Plugin;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -38,8 +38,8 @@ class Tools {
 			return $info;
 		}
 
-		$info['sbssc-sales-by-state'] = array(
-			'label'  => __( 'Sales by State Report for SureCart', 'sales-by-state-report-for-surecart' ),
+		$info['sbss-sales-by-state'] = array(
+			'label'  => __( 'Sales by State Report for Shopify', 'sales-by-state-report-for-shopify' ),
 			'fields' => $this->fields(),
 		);
 
@@ -57,8 +57,8 @@ class Tools {
 		if ( ! Schema::table_exists() ) {
 			return array(
 				'table' => array(
-					'label' => __( 'Report table', 'sales-by-state-report-for-surecart' ),
-					'value' => __( 'Missing', 'sales-by-state-report-for-surecart' ),
+					'label' => __( 'Report table', 'sales-by-state-report-for-shopify' ),
+					'value' => __( 'Missing', 'sales-by-state-report-for-shopify' ),
 				),
 			);
 		}
@@ -67,29 +67,29 @@ class Tools {
 		$remaining = Backfill::remaining();
 
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$by_status = $wpdb->get_results( "SELECT status, COUNT(*) AS total FROM {$wpdb->prefix}sbssc_order_state GROUP BY status ORDER BY total DESC", ARRAY_A );
-		$countries = $wpdb->get_results( "SELECT shipping_country AS country, COUNT(*) AS total FROM {$wpdb->prefix}sbssc_order_state GROUP BY shipping_country ORDER BY total DESC", ARRAY_A );
-		$no_state  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}sbssc_order_state WHERE shipping_state = '' AND billing_state = ''" );
+		$by_status = $wpdb->get_results( "SELECT status, COUNT(*) AS total FROM {$wpdb->prefix}sbss_order_state GROUP BY status ORDER BY total DESC", ARRAY_A );
+		$countries = $wpdb->get_results( "SELECT shipping_country AS country, COUNT(*) AS total FROM {$wpdb->prefix}sbss_order_state GROUP BY shipping_country ORDER BY total DESC", ARRAY_A );
+		$no_state  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}sbss_order_state WHERE shipping_state = '' AND billing_state = ''" );
 		// phpcs:enable
 
 		$fields = array(
 			'rows'      => array(
-				'label' => __( 'Rows in report table', 'sales-by-state-report-for-surecart' ),
+				'label' => __( 'Rows in report table', 'sales-by-state-report-for-shopify' ),
 				'value' => number_format_i18n( $counts['rows'] ),
 			),
 			'orders'    => array(
-				'label' => __( 'Orders on the SureCart account', 'sales-by-state-report-for-surecart' ),
+				'label' => __( 'Orders on the Shopify account', 'sales-by-state-report-for-shopify' ),
 				'value' => number_format_i18n( $counts['orders'] ),
 			),
 			'remaining' => array(
-				'label' => __( 'Orders still to import', 'sales-by-state-report-for-surecart' ),
+				'label' => __( 'Orders still to import', 'sales-by-state-report-for-shopify' ),
 				'value' => number_format_i18n( $remaining ),
 			),
 		);
 
 		if ( $no_state > 0 ) {
 			$fields['no_state'] = array(
-				'label' => __( 'Rows with no state', 'sales-by-state-report-for-surecart' ),
+				'label' => __( 'Rows with no state', 'sales-by-state-report-for-shopify' ),
 				'value' => number_format_i18n( $no_state ),
 			);
 		}
@@ -102,7 +102,7 @@ class Tools {
 
 		if ( $bits ) {
 			$fields['by_status'] = array(
-				'label' => __( 'By status', 'sales-by-state-report-for-surecart' ),
+				'label' => __( 'By status', 'sales-by-state-report-for-shopify' ),
 				'value' => implode( ', ', $bits ),
 			);
 		}
@@ -110,13 +110,13 @@ class Tools {
 		$bits = array();
 
 		foreach ( (array) $countries as $row ) {
-			$code   = '' === $row['country'] ? __( '(blank)', 'sales-by-state-report-for-surecart' ) : $row['country'];
+			$code   = '' === $row['country'] ? __( '(blank)', 'sales-by-state-report-for-shopify' ) : $row['country'];
 			$bits[] = $code . ': ' . number_format_i18n( (int) $row['total'] );
 		}
 
 		if ( $bits ) {
 			$fields['countries'] = array(
-				'label' => __( 'Countries', 'sales-by-state-report-for-surecart' ),
+				'label' => __( 'Countries', 'sales-by-state-report-for-shopify' ),
 				'value' => implode( ', ', $bits ),
 			);
 		}

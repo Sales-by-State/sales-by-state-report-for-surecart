@@ -2,10 +2,10 @@
 /**
  * Plugin bootstrap.
  *
- * @package SalesByStateReportForSureCart
+ * @package SalesByStateReportForShopify
  */
 
-namespace SBSSC;
+namespace SBSS;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -37,13 +37,10 @@ class Plugin {
 	/**
 	 * Whether the current user may open the report.
 	 *
-	 * Matches SureCart's Orders screen (`edit_sc_orders`) so shop managers
-	 * who can see orders can see this report.
-	 *
 	 * @return bool
 	 */
 	public static function can_view() {
-		return current_user_can( 'edit_sc_orders' ) || self::can_manage();
+		return self::can_manage();
 	}
 
 	/**
@@ -52,7 +49,7 @@ class Plugin {
 	 * @return bool
 	 */
 	public static function can_manage() {
-		return current_user_can( 'manage_sc_shop_settings' ) || current_user_can( 'manage_options' );
+		return current_user_can( 'manage_options' );
 	}
 
 	/**

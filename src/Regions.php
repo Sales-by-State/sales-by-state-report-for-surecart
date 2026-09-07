@@ -2,18 +2,20 @@
 /**
  * Country and state labels for the report.
  *
- * @package SalesByStateReportForSureCart
+ * @package SalesByStateReportForShopify
  */
 
-namespace SBSSC;
+namespace SBSS;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * US, Canada, and UK subdivisions.
  *
- * SureCart does not ship a WooCommerce-style locale helper, so the codes
- * the report fills in as zero-sales rows are listed here.
+ * Shopify Admin API orders store a billing country and state. US and Canada
+ * typically write the full name (California, Ontario). UK orders write
+ * the county name into `state`, so those labels live here so zero-sales
+ * rows still appear.
  */
 class Regions {
 
@@ -24,10 +26,53 @@ class Regions {
 	 */
 	public static function countries() {
 		return array(
-			'US' => __( 'United States', 'sales-by-state-report-for-surecart' ),
-			'CA' => __( 'Canada', 'sales-by-state-report-for-surecart' ),
-			'GB' => __( 'United Kingdom', 'sales-by-state-report-for-surecart' ),
+			'US' => __( 'United States', 'sales-by-state-report-for-shopify' ),
+			'CA' => __( 'Canada', 'sales-by-state-report-for-shopify' ),
+			'GB' => __( 'United Kingdom', 'sales-by-state-report-for-shopify' ),
 		);
+	}
+
+	/**
+	 * Map a stored state name or code onto the catalog key.
+	 *
+	 * Shopify often stores "California" rather than "CA". UK county
+	 * names are kept as names.
+	 *
+	 * @param string $country Country code.
+	 * @param string $state   State code or name.
+	 * @return string
+	 */
+	public static function normalize_state( $country, $state ) {
+		$country = strtoupper( (string) $country );
+		$state   = trim( (string) $state );
+
+		if ( '' === $state ) {
+			return '';
+		}
+
+		$catalog = self::states_for( $country );
+
+		if ( ! $catalog ) {
+			return substr( $state, 0, 50 );
+		}
+
+		if ( isset( $catalog[ $state ] ) ) {
+			return $state;
+		}
+
+		$upper = strtoupper( $state );
+
+		if ( isset( $catalog[ $upper ] ) ) {
+			return $upper;
+		}
+
+		foreach ( $catalog as $code => $name ) {
+			if ( 0 === strcasecmp( (string) $code, $state ) || 0 === strcasecmp( (string) $name, $state ) ) {
+				return (string) $code;
+			}
+		}
+
+		return substr( $state, 0, 50 );
 	}
 
 	/**
@@ -139,16 +184,94 @@ class Regions {
 	}
 
 	/**
-	 * UK countries.
+	 * UK counties as Shopify stores them in the state field.
+	 *
+	 * Keys are county names, not ENG/SCT/WLS/NIR codes, because UK orders
+	 * write the county name into `state`.
 	 *
 	 * @return array<string,string>
 	 */
 	private static function united_kingdom() {
-		return array(
-			'ENG' => 'England',
-			'SCT' => 'Scotland',
-			'WLS' => 'Wales',
-			'NIR' => 'Northern Ireland',
+		$names = array(
+			'London',
+			'Greater London',
+			'Greater Manchester',
+			'West Midlands',
+			'West Yorkshire',
+			'South Yorkshire',
+			'Merseyside',
+			'Tyne and Wear',
+			'Kent',
+			'Essex',
+			'Hampshire',
+			'Surrey',
+			'Lancashire',
+			'Hertfordshire',
+			'Norfolk',
+			'Suffolk',
+			'Devon',
+			'Cornwall',
+			'Somerset',
+			'Dorset',
+			'Wiltshire',
+			'Gloucestershire',
+			'Oxfordshire',
+			'Buckinghamshire',
+			'Berkshire',
+			'Bedfordshire',
+			'Cambridgeshire',
+			'Northamptonshire',
+			'Leicestershire',
+			'Nottinghamshire',
+			'Derbyshire',
+			'Staffordshire',
+			'Warwickshire',
+			'Worcestershire',
+			'Herefordshire',
+			'Shropshire',
+			'Cheshire',
+			'Cumbria',
+			'Northumberland',
+			'Durham',
+			'Lincolnshire',
+			'North Yorkshire',
+			'East Riding of Yorkshire',
+			'East Sussex',
+			'West Sussex',
+			'Isle of Wight',
+			'Rutland',
+			'Bristol',
+			'Midlothian',
+			'West Lothian',
+			'East Lothian',
+			'Fife',
+			'Lanarkshire',
+			'Aberdeenshire',
+			'Highland',
+			'Glasgow',
+			'Edinburgh',
+			'South Glamorgan',
+			'Mid Glamorgan',
+			'West Glamorgan',
+			'Gwent',
+			'Gwynedd',
+			'Dyfed',
+			'Clwyd',
+			'Powys',
+			'Antrim',
+			'Armagh',
+			'Down',
+			'Fermanagh',
+			'Londonderry',
+			'Tyrone',
 		);
+
+		$out = array();
+
+		foreach ( $names as $name ) {
+			$out[ $name ] = $name;
+		}
+
+		return $out;
 	}
 }

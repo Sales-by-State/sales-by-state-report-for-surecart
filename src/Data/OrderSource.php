@@ -1,128 +1,154 @@
 <?php
 /**
- * Locates SureCart orders through the API.
+ * Locates Shopify orders through the Admin API.
  *
- * @package SalesByStateReportForSureCart
+ * @package SalesByStateReportForShopify
  */
 
-namespace SBSSC\Data;
-
-use SureCart\Models\Order;
+namespace SBSS\Data;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Pages orders from the SureCart API (test and live).
+ * Pages orders from the Shopify Admin GraphQL API.
  */
 class OrderSource {
 
 	/**
-	 * Relations needed to build a report row.
-	 *
-	 * @return string[]
+	 * Orders query used for import.
 	 */
-	public static function expands() {
-		return array(
-			'checkout',
-			'checkout.invoice',
-			'checkout.shipping_address',
-			'checkout.billing_address',
-		);
-	}
+	const ORDERS_QUERY = 'query Orders($first: Int!, $after: String) {
+		orders(first: $first, after: $after, sortKey: CREATED_AT, reverse: false) {
+			pageInfo { hasNextPage endCursor }
+			nodes {
+				id
+				name
+				createdAt
+				processedAt
+				cancelledAt
+				displayFinancialStatus
+				currentTotalPriceSet { shopMoney { amount currencyCode } }
+				currentTotalTaxSet { shopMoney { amount } }
+				totalShippingPriceSet { shopMoney { amount } }
+				shippingAddress { countryCodeV2 provinceCode province }
+				billingAddress { countryCodeV2 provinceCode province }
+			}
+		}
+	}';
 
 	/**
-	 * Total number of orders on the SureCart account.
+	 * Total number of orders on the Shopify store.
 	 *
 	 * @return int
 	 */
 	public static function count() {
-		$cached = get_transient( 'sbssc_order_count' );
+		$cached = get_transient( 'sbss_order_count' );
 
 		if ( false !== $cached ) {
 			return (int) $cached;
 		}
 
-		$total = self::count_mode( false ) + self::count_mode( true );
+		if ( ! Client::ready() ) {
+			set_transient( 'sbss_order_count', 0, MINUTE_IN_SECONDS );
+			return 0;
+		}
 
-		set_transient( 'sbssc_order_count', $total, MINUTE_IN_SECONDS );
+		$client = new Client();
+		$result = $client->graphql( 'query { ordersCount(query: "") { count } }' );
+
+		if ( is_wp_error( $result ) ) {
+			return 0;
+		}
+
+		$total = isset( $result['ordersCount']['count'] ) ? (int) $result['ordersCount']['count'] : 0;
+
+		set_transient( 'sbss_order_count', $total, MINUTE_IN_SECONDS );
 
 		return $total;
 	}
 
 	/**
-	 * Count orders in one mode.
+	 * One page of orders, oldest first so the cursor is stable.
 	 *
-	 * @param bool $live Live mode.
-	 * @return int
+	 * @param string $after  GraphQL cursor.
+	 * @param int    $limit  Page size.
+	 * @return array{orders:array,count:int,after:string,has_next:bool}|\WP_Error
 	 */
-	public static function count_mode( $live ) {
-		if ( ! class_exists( Order::class ) ) {
-			return 0;
+	public static function page( $after, $limit ) {
+		if ( ! Client::ready() ) {
+			return new \WP_Error(
+				'sbss_disconnected',
+				__( 'Connect a Shopify Admin API token before importing orders. The WordPress plugin token is Storefront-only.', 'sales-by-state-report-for-shopify' )
+			);
 		}
 
-		$page = Order::where( array( 'live_mode' => (bool) $live ) )->paginate(
-			array(
-				'page'     => 1,
-				'per_page' => 1,
-			)
-		);
+		$limit    = max( 1, min( 50, (int) $limit ) );
+		$after    = is_string( $after ) ? $after : '';
+		$client   = new Client();
+		$variables = array( 'first' => $limit );
 
-		if ( is_wp_error( $page ) || ! is_object( $page ) ) {
-			return 0;
+		if ( $after ) {
+			$variables['after'] = $after;
 		}
 
-		return (int) ( $page->pagination->count ?? 0 );
-	}
-
-	/**
-	 * One page of orders.
-	 *
-	 * @param bool $live  Live mode.
-	 * @param int  $page  Page number (1-based).
-	 * @param int  $limit Page size.
-	 * @return array{orders:array,count:int}|\WP_Error
-	 */
-	public static function page( $live, $page, $limit ) {
-		if ( ! class_exists( Order::class ) ) {
-			return new \WP_Error( 'sbssc_surecart', __( 'SureCart is not available.', 'sales-by-state-report-for-surecart' ) );
-		}
-
-		$page  = max( 1, (int) $page );
-		$limit = max( 1, min( 20, (int) $limit ) );
-
-		$result = Order::with( self::expands() )->where( array( 'live_mode' => (bool) $live ) )->paginate(
-			array(
-				'page'     => $page,
-				'per_page' => $limit,
-			)
-		);
+		$result = $client->graphql( self::ORDERS_QUERY, $variables );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
 
+		$connection = isset( $result['orders'] ) && is_array( $result['orders'] ) ? $result['orders'] : array();
+		$nodes      = isset( $connection['nodes'] ) && is_array( $connection['nodes'] ) ? $connection['nodes'] : array();
+		$page_info  = isset( $connection['pageInfo'] ) && is_array( $connection['pageInfo'] ) ? $connection['pageInfo'] : array();
+
 		return array(
-			'orders' => self::items( $result ),
-			'count'  => (int) ( $result->pagination->count ?? 0 ),
+			'orders'   => $nodes,
+			'count'    => self::count(),
+			'after'    => (string) ( $page_info['endCursor'] ?? '' ),
+			'has_next' => ! empty( $page_info['hasNextPage'] ),
 		);
 	}
 
 	/**
-	 * Orders on a SureCart Collection.
+	 * Newest orders, used to keep the table current after the first import.
 	 *
-	 * Read `$result->data` directly. `empty()` is unreliable on Collection
-	 * because the property is exposed through `__get()` without `__isset()`.
-	 *
-	 * @param mixed $result Paginate result.
+	 * @param int $limit Page size.
 	 * @return array
 	 */
-	private static function items( $result ) {
-		if ( ! is_object( $result ) ) {
+	public static function recent( $limit = 50 ) {
+		if ( ! Client::ready() ) {
 			return array();
 		}
 
-		$data = $result->data;
+		$limit  = max( 1, min( 50, (int) $limit ) );
+		$client = new Client();
+		$result = $client->graphql(
+			'query Recent($first: Int!) {
+				orders(first: $first, sortKey: CREATED_AT, reverse: true) {
+					nodes {
+						id
+						name
+						createdAt
+						processedAt
+						cancelledAt
+						displayFinancialStatus
+						currentTotalPriceSet { shopMoney { amount currencyCode } }
+						currentTotalTaxSet { shopMoney { amount } }
+						totalShippingPriceSet { shopMoney { amount } }
+						shippingAddress { countryCodeV2 provinceCode province }
+						billingAddress { countryCodeV2 provinceCode province }
+					}
+				}
+			}',
+			array( 'first' => $limit )
+		);
 
-		return is_array( $data ) ? $data : array();
+		if ( is_wp_error( $result ) ) {
+			return array();
+		}
+
+		$nodes = $result['orders']['nodes'] ?? array();
+
+		return is_array( $nodes ) ? $nodes : array();
 	}
 }

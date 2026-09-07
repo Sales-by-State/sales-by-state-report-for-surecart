@@ -1,79 +1,52 @@
 <?php
 /**
- * Keeps the report table in step with SureCart orders.
+ * Keeps the report table in step with Shopify orders.
  *
- * @package SalesByStateReportForSureCart
+ * @package SalesByStateReportForShopify
  */
 
-namespace SBSSC\Data;
+namespace SBSS\Data;
 
-use SBSSC\Install\Schema;
-use SureCart\Models\Checkout;
-use SureCart\Models\Order;
+use SBSS\Install\Schema;
+use SBSS\Regions;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Writes one row per order.
  *
- * Refunds are not modelled: an order that has been refunded carries a
- * canceled or similar status and is included or excluded by the status
- * filter like any other order.
+ * Orders live on the Shopify Admin API, not in WordPress. Rows are written
+ * during the one-off import and by the recent-order poll. Refunds are not
+ * modelled: a refunded order is included or excluded by the status filter
+ * like any other order.
  */
 class Sync {
 
 	/**
 	 * Register hooks.
 	 *
+	 * Live order writes happen through Scheduler::sync_recent(); the official
+	 * Shopify WordPress plugin does not fire a local order-save hook.
+	 *
 	 * @return void
 	 */
 	public function register() {
-		add_action( 'surecart/checkout_confirmed', array( $this, 'on_checkout' ), 20, 1 );
-		add_action( 'surecart/purchase_created', array( $this, 'on_purchase' ), 20, 1 );
-	}
-
-	/**
-	 * Handle a confirmed checkout.
-	 *
-	 * @param mixed $checkout Checkout model.
-	 * @return void
-	 */
-	public function on_checkout( $checkout ) {
-		$order_id = $this->order_id_from( $checkout );
-
-		if ( $order_id ) {
-			$this->upsert( $order_id );
-		}
-	}
-
-	/**
-	 * Handle a purchase that may belong to an order.
-	 *
-	 * @param mixed $purchase Purchase model.
-	 * @return void
-	 */
-	public function on_purchase( $purchase ) {
-		$order_id = $this->order_id_from( $purchase );
-
-		if ( $order_id ) {
-			$this->upsert( $order_id );
-		}
 	}
 
 	/**
 	 * Insert or update the row for one order.
 	 *
-	 * @param string|object $order Order ID or model.
+	 * @param array|string $order Order array or GID.
 	 * @return bool
 	 */
 	public function upsert( $order ) {
 		global $wpdb;
 
-		if ( is_string( $order ) || is_numeric( $order ) ) {
-			$order = $this->load_order( (string) $order );
+		if ( is_string( $order ) ) {
+			$order = $this->load_order( $order );
 		}
 
-		if ( ! is_object( $order ) || is_wp_error( $order ) ) {
+		if ( ! is_array( $order ) ) {
 			return false;
 		}
 
@@ -94,7 +67,7 @@ class Sync {
 	/**
 	 * Remove the row for an order.
 	 *
-	 * @param string $order_id Order ID.
+	 * @param string $order_id Order GID or numeric id.
 	 * @return void
 	 */
 	public function delete( $order_id ) {
@@ -111,75 +84,58 @@ class Sync {
 	}
 
 	/**
-	 * Build the row for a SureCart order.
+	 * Build the row for a Shopify Admin API order.
 	 *
-	 * Money is stored in cents on the API and as decimals in the report table.
+	 * Money is stored as decimals on the API and in the report table.
+	 * Net Sales is total including tax, minus tax, minus shipping.
+	 * Gross Sales is total including tax.
 	 *
-	 * @param object $order Order model.
+	 * @param array $order Order.
 	 * @return array<string,mixed>|false
 	 */
 	public static function build_row( $order ) {
-		$order_id = isset( $order->id ) ? (string) $order->id : '';
+		if ( ! is_array( $order ) ) {
+			return false;
+		}
+
+		$order_id = self::order_id_of( $order );
 
 		if ( ! $order_id ) {
 			return false;
 		}
 
-		$checkout = self::checkout_of( $order );
+		$billing  = self::address_of( $order['billingAddress'] ?? null );
+		$shipping = self::address_of( $order['shippingAddress'] ?? null );
 
-		$billing  = self::address_of( $checkout, 'billing_address' );
-		$shipping = self::address_of( $checkout, 'shipping_address' );
-
-		$billing_country  = strtoupper( substr( (string) ( $billing['country'] ?? '' ), 0, 2 ) );
-		$billing_state    = (string) ( $billing['state'] ?? '' );
-		$shipping_country = strtoupper( substr( (string) ( $shipping['country'] ?? '' ), 0, 2 ) );
-		$shipping_state   = (string) ( $shipping['state'] ?? '' );
-
-		if ( '' === $shipping_country ) {
-			$shipping_country = $billing_country;
-			$shipping_state   = $billing_state;
+		if ( '' === $shipping['country'] ) {
+			$shipping = $billing;
 		}
 
-		$total    = self::from_cents( $checkout->total_amount ?? 0, $checkout );
-		$tax      = self::from_cents( $checkout->tax_amount ?? 0, $checkout );
-		$shipping_total = self::from_cents( $checkout->shipping_amount ?? 0, $checkout );
+		$billing_state  = Regions::normalize_state( $billing['country'], $billing['state'] );
+		$shipping_state = Regions::normalize_state( $shipping['country'], $shipping['state'] );
 
-		if ( $tax <= 0 ) {
-			$tax = self::from_cents( $checkout->tax_exclusive_amount ?? 0, $checkout );
-		}
+		$total          = self::money_of( $order['currentTotalPriceSet']['shopMoney']['amount'] ?? 0 );
+		$tax            = self::money_of( $order['currentTotalTaxSet']['shopMoney']['amount'] ?? 0 );
+		$shipping_total = self::money_of( $order['totalShippingPriceSet']['shopMoney']['amount'] ?? 0 );
+		$status         = self::normalize_status( $order );
+		$created        = self::normalize_datetime( $order['createdAt'] ?? null );
+		$paid           = self::is_paid_status( $status ) ? self::normalize_datetime( $order['processedAt'] ?? $order['createdAt'] ?? null ) : null;
+		$currency       = strtoupper( substr( (string) ( $order['currentTotalPriceSet']['shopMoney']['currencyCode'] ?? '' ), 0, 3 ) );
 
-		if ( $tax <= 0 ) {
-			$tax = self::from_cents( $checkout->tax_inclusive_amount ?? 0, $checkout );
-		}
-
-		$created = self::normalize_datetime( $order->created_at ?? null );
-		$paid    = self::normalize_datetime( $checkout->paid_at ?? null );
-		$sale    = self::sale_datetime( $order, $checkout );
-
-		if ( $sale ) {
-			$created = $sale;
-
-			if ( in_array( self::normalize_status( $order->status ?? '' ), array( 'paid', 'processing' ), true ) ) {
-				$paid = $sale;
-			} elseif ( ! $paid ) {
-				$paid = null;
-			}
-		}
-
-		if ( ! $paid && in_array( self::normalize_status( $order->status ?? '' ), array( 'paid', 'processing' ), true ) ) {
-			$paid = $created;
+		if ( ! $currency ) {
+			$currency = 'USD';
 		}
 
 		return array(
 			'order_id'         => substr( $order_id, 0, 64 ),
-			'status'           => substr( self::normalize_status( $order->status ?? '' ), 0, 32 ),
+			'status'           => substr( $status, 0, 32 ),
 			'date_created'     => $created ? $created : '0000-00-00 00:00:00',
 			'date_paid'        => $paid ? $paid : null,
-			'billing_country'  => $billing_country,
+			'billing_country'  => $billing['country'],
 			'billing_state'    => substr( $billing_state, 0, 50 ),
-			'shipping_country' => $shipping_country,
+			'shipping_country' => $shipping['country'],
 			'shipping_state'   => substr( $shipping_state, 0, 50 ),
-			'currency'         => strtoupper( substr( (string) ( $checkout->currency ?? 'usd' ), 0, 3 ) ),
+			'currency'         => $currency,
 			'total_sales'      => $total,
 			'tax_total'        => $tax,
 			'shipping_total'   => $shipping_total,
@@ -188,146 +144,141 @@ class Sync {
 	}
 
 	/**
-	 * Load an order with addresses expanded.
+	 * Load one order from the API.
 	 *
-	 * @param string $order_id Order ID.
-	 * @return object|null
+	 * @param string $order_id GID.
+	 * @return array|null
 	 */
 	private function load_order( $order_id ) {
-		if ( ! class_exists( Order::class ) || ! $order_id ) {
+		$order_id = (string) $order_id;
+
+		if ( ! $order_id || ! Client::ready() ) {
 			return null;
 		}
 
-		$order = Order::with( OrderSource::expands() )->find( $order_id );
+		if ( 0 !== strpos( $order_id, 'gid://' ) ) {
+			$order_id = 'gid://shopify/Order/' . preg_replace( '/[^0-9]/', '', $order_id );
+		}
 
-		return is_wp_error( $order ) ? null : $order;
+		$client = new Client();
+		$result = $client->graphql(
+			'query One($id: ID!) {
+				order(id: $id) {
+					id
+					name
+					createdAt
+					processedAt
+					cancelledAt
+					displayFinancialStatus
+					currentTotalPriceSet { shopMoney { amount currencyCode } }
+					currentTotalTaxSet { shopMoney { amount } }
+					totalShippingPriceSet { shopMoney { amount } }
+					shippingAddress { countryCodeV2 provinceCode province }
+					billingAddress { countryCodeV2 provinceCode province }
+				}
+			}',
+			array( 'id' => $order_id )
+		);
+
+		if ( is_wp_error( $result ) || empty( $result['order'] ) || ! is_array( $result['order'] ) ) {
+			return null;
+		}
+
+		return $result['order'];
 	}
 
 	/**
-	 * Checkout model on an order.
+	 * Stable order id for the report table.
 	 *
-	 * @param object $order Order.
-	 * @return object
+	 * @param array $order Order.
+	 * @return string
 	 */
-	private static function checkout_of( $order ) {
-		$checkout = $order->checkout ?? null;
+	private static function order_id_of( array $order ) {
+		$id = (string) ( $order['id'] ?? '' );
 
-		if ( is_string( $checkout ) && $checkout && class_exists( Checkout::class ) ) {
-			$loaded = Checkout::with( array( 'shipping_address', 'billing_address', 'invoice' ) )->find( $checkout );
-			$checkout = is_wp_error( $loaded ) ? null : $loaded;
+		if ( preg_match( '#gid://shopify/Order/(\d+)#', $id, $match ) ) {
+			return $match[1];
 		}
 
-		return is_object( $checkout ) ? $checkout : (object) array();
+		return $id;
 	}
 
 	/**
-	 * Sale datetime for the year filter.
+	 * Country and state from a Shopify address object.
 	 *
-	 * Prefers the invoice issue date when the checkout belongs to an invoice,
-	 * then checkout.paid_at, then order.created_at.
-	 *
-	 * @param object $order    Order.
-	 * @param object $checkout Checkout.
-	 * @return string|null
-	 */
-	private static function sale_datetime( $order, $checkout ) {
-		$invoice = self::invoice_of( $checkout );
-		$issue   = is_object( $invoice ) ? self::normalize_datetime( $invoice->issue_date ?? null ) : null;
-
-		if ( $issue ) {
-			return $issue;
-		}
-
-		$paid = self::normalize_datetime( is_object( $checkout ) ? ( $checkout->paid_at ?? null ) : null );
-
-		if ( $paid ) {
-			return $paid;
-		}
-
-		return self::normalize_datetime( $order->created_at ?? null );
-	}
-
-	/**
-	 * Invoice on a checkout, if expanded.
-	 *
-	 * @param object $checkout Checkout.
-	 * @return object|null
-	 */
-	private static function invoice_of( $checkout ) {
-		$invoice = is_object( $checkout ) ? ( $checkout->invoice ?? null ) : null;
-
-		if ( is_object( $invoice ) ) {
-			return $invoice;
-		}
-
-		return null;
-	}
-
-	/**
-	 * Country and state from a checkout address relation.
-	 *
-	 * @param object $checkout Checkout.
-	 * @param string $key      shipping_address or billing_address.
+	 * @param mixed $address Address.
 	 * @return array{country:string,state:string}
 	 */
-	private static function address_of( $checkout, $key ) {
-		$address = is_object( $checkout ) ? ( $checkout->{$key} ?? null ) : null;
-
-		if ( is_array( $address ) ) {
+	private static function address_of( $address ) {
+		if ( ! is_array( $address ) ) {
 			return array(
-				'country' => (string) ( $address['country'] ?? '' ),
-				'state'   => (string) ( $address['state'] ?? '' ),
+				'country' => '',
+				'state'   => '',
 			);
 		}
 
-		if ( is_object( $address ) ) {
-			return array(
-				'country' => (string) ( $address->country ?? '' ),
-				'state'   => (string) ( $address->state ?? '' ),
-			);
+		$country = strtoupper( substr( (string) ( $address['countryCodeV2'] ?? '' ), 0, 2 ) );
+		$state   = (string) ( $address['provinceCode'] ?? '' );
+
+		if ( ! $state ) {
+			$state = (string) ( $address['province'] ?? '' );
 		}
 
 		return array(
-			'country' => '',
-			'state'   => '',
+			'country' => preg_match( '/^[A-Z]{2}$/', $country ) ? $country : '',
+			'state'   => $state,
 		);
 	}
 
 	/**
-	 * Map SureCart API status onto the report filter keys.
+	 * Map a Shopify financial status onto a report status key.
 	 *
-	 * @param string $status Status.
+	 * @param array $order Order.
 	 * @return string
 	 */
-	private static function normalize_status( $status ) {
-		$status = sanitize_key( (string) $status );
+	private static function normalize_status( array $order ) {
+		$status = strtolower( (string) ( $order['displayFinancialStatus'] ?? '' ) );
+		$status = str_replace( array( ' ', '-' ), '_', $status );
 
-		if ( 'void' === $status ) {
-			return 'canceled';
+		if ( 'canceled' === $status ) {
+			$status = 'cancelled';
 		}
 
-		return $status;
+		return $status ? $status : 'pending';
 	}
 
 	/**
-	 * Convert API cents to a decimal amount.
+	 * Statuses that represent a sale for the year filter.
 	 *
-	 * @param mixed  $cents    Amount in cents.
-	 * @param object $checkout Checkout, for zero-decimal currencies.
+	 * @param string $status Status key.
+	 * @return bool
+	 */
+	private static function is_paid_status( $status ) {
+		return in_array(
+			$status,
+			array(
+				'paid',
+				'partially_paid',
+				'partially_refunded',
+				'refunded',
+				'authorized',
+			),
+			true
+		);
+	}
+
+	/**
+	 * Parse a money string.
+	 *
+	 * @param mixed $value Amount.
 	 * @return float
 	 */
-	private static function from_cents( $cents, $checkout ) {
-		$cents = (int) $cents;
-
-		if ( is_object( $checkout ) && ! empty( $checkout->is_zero_decimal ) ) {
-			return (float) $cents;
-		}
-
-		return round( $cents / 100, 2 );
+	private static function money_of( $value ) {
+		return round( (float) $value, 2 );
 	}
 
 	/**
-	 * Normalise a unix timestamp or datetime string.
+	 * Normalise an ISO datetime string.
 	 *
 	 * @param mixed $value Datetime.
 	 * @return string|null
@@ -337,50 +288,8 @@ class Sync {
 			return null;
 		}
 
-		if ( is_numeric( $value ) ) {
-			return gmdate( 'Y-m-d H:i:s', (int) $value );
-		}
-
 		$ts = strtotime( (string) $value );
 
 		return $ts ? gmdate( 'Y-m-d H:i:s', $ts ) : null;
-	}
-
-	/**
-	 * Pull an order ID out of a SureCart event payload.
-	 *
-	 * @param mixed $payload Event payload.
-	 * @return string
-	 */
-	private function order_id_from( $payload ) {
-		if ( is_object( $payload ) && ! empty( $payload->order ) ) {
-			$order = $payload->order;
-
-			if ( is_object( $order ) && ! empty( $order->id ) ) {
-				return (string) $order->id;
-			}
-
-			if ( is_string( $order ) ) {
-				return $order;
-			}
-		}
-
-		if ( is_object( $payload ) && isset( $payload->id ) && 0 === strpos( (string) $payload->id, 'order_' ) ) {
-			return (string) $payload->id;
-		}
-
-		if ( is_array( $payload ) && ! empty( $payload['order'] ) ) {
-			$order = $payload['order'];
-
-			if ( is_array( $order ) && ! empty( $order['id'] ) ) {
-				return (string) $order['id'];
-			}
-
-			if ( is_string( $order ) ) {
-				return $order;
-			}
-		}
-
-		return '';
 	}
 }

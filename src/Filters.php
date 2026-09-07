@@ -2,12 +2,10 @@
 /**
  * The values the report's three filters can take.
  *
- * @package SalesByStateReportForSureCart
+ * @package SalesByStateReportForShopify
  */
 
-namespace SBSSC;
-
-use SureCart\Models\TaxProtocol;
+namespace SBSS;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -23,7 +21,7 @@ class Filters {
 	/**
 	 * Option holding the first year offered by the year filter.
 	 */
-	const YEAR_START_OPTION = 'sbssc_year_start';
+	const YEAR_START_OPTION = 'sbss_year_start';
 
 	/**
 	 * Number of years offered when the list is first created.
@@ -38,11 +36,11 @@ class Filters {
 	public static function measures() {
 		return array(
 			'net_revenue'   => array(
-				'label' => __( 'Net Sales', 'sales-by-state-report-for-surecart' ),
+				'label' => __( 'Net Sales', 'sales-by-state-report-for-shopify' ),
 				'type'  => 'currency',
 			),
 			'gross_revenue' => array(
-				'label' => __( 'Gross Sales', 'sales-by-state-report-for-surecart' ),
+				'label' => __( 'Gross Sales', 'sales-by-state-report-for-shopify' ),
 				'type'  => 'currency',
 			),
 		);
@@ -60,15 +58,20 @@ class Filters {
 	/**
 	 * Order statuses the filter offers.
 	 *
+	 * Keys match Shopify Admin API status_id slugs.
+	 *
 	 * @return array<string,string>
 	 */
 	public static function order_statuses() {
 		return array(
-			'paid'           => __( 'Paid', 'sales-by-state-report-for-surecart' ),
-			'processing'     => __( 'Processing', 'sales-by-state-report-for-surecart' ),
-			'draft'          => __( 'Draft', 'sales-by-state-report-for-surecart' ),
-			'payment_failed' => __( 'Failed', 'sales-by-state-report-for-surecart' ),
-			'canceled'       => __( 'Canceled', 'sales-by-state-report-for-surecart' ),
+			'paid'               => __( 'Paid', 'sales-by-state-report-for-shopify' ),
+			'partially_paid'     => __( 'Partially paid', 'sales-by-state-report-for-shopify' ),
+			'authorized'         => __( 'Authorized', 'sales-by-state-report-for-shopify' ),
+			'pending'            => __( 'Pending', 'sales-by-state-report-for-shopify' ),
+			'partially_refunded' => __( 'Partially refunded', 'sales-by-state-report-for-shopify' ),
+			'refunded'           => __( 'Refunded', 'sales-by-state-report-for-shopify' ),
+			'voided'             => __( 'Voided', 'sales-by-state-report-for-shopify' ),
+			'expired'            => __( 'Expired', 'sales-by-state-report-for-shopify' ),
 		);
 	}
 
@@ -85,7 +88,7 @@ class Filters {
 		 *
 		 * @param string[] $statuses Status keys.
 		 */
-		$statuses = (array) apply_filters( 'sbssc_default_statuses', array( 'paid' ) );
+		$statuses = (array) apply_filters( 'sbss_default_statuses', array( 'paid' ) );
 
 		return array_values( array_intersect( $statuses, array_keys( self::order_statuses() ) ) );
 	}
@@ -111,8 +114,8 @@ class Filters {
 		foreach ( $value as $status ) {
 			$status = sanitize_key( trim( (string) $status ) );
 
-			if ( 'void' === $status ) {
-				$status = 'canceled';
+			if ( 'canceled' === $status ) {
+				$status = 'cancelled';
 			}
 
 			if ( in_array( $status, $offered, true ) ) {
@@ -171,7 +174,7 @@ class Filters {
 	 * @return string Two-letter country code.
 	 */
 	public static function default_country() {
-		$cached = get_transient( 'sbssc_store_country' );
+		$cached = get_transient( 'sbss_store_country' );
 
 		if ( is_string( $cached ) && Regions::states_for( $cached ) ) {
 			return $cached;
@@ -179,23 +182,11 @@ class Filters {
 
 		$code = 'US';
 
-		if ( class_exists( TaxProtocol::class ) ) {
-			$protocol = TaxProtocol::find();
-
-			if ( ! is_wp_error( $protocol ) && is_object( $protocol ) && ! empty( $protocol->address->country ) ) {
-				$maybe = strtoupper( (string) $protocol->address->country );
-
-				if ( preg_match( '/^[A-Z]{2}$/', $maybe ) ) {
-					$code = $maybe;
-				}
-			}
-		}
-
 		if ( ! Regions::states_for( $code ) ) {
 			$code = 'US';
 		}
 
-		set_transient( 'sbssc_store_country', $code, 12 * HOUR_IN_SECONDS );
+		set_transient( 'sbss_store_country', $code, 12 * HOUR_IN_SECONDS );
 
 		return $code;
 	}

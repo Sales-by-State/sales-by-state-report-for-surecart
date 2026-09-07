@@ -1,12 +1,4 @@
-*** Sales by State Report for SureCart Changelog ***
+*** Sales by State Report for Shopify Changelog ***
 
-2026-08-29 - version 1.1.0
-* Align capabilities, menu and enqueue with SureCart's admin add-on pattern.
-* Use invoice issue date for the year filter when the checkout belongs to an invoice.
-* Add a Site Health info section for the report table.
-
-2026-08-28 - version 1.0.1
-* Import existing SureCart orders into the report table. A PHP empty() check on SureCart collections skipped every page.
-
-2026-08-28 - version 1.0.0
+2026-09-02 - version 1.0.0
 * Initial release.

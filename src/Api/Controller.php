@@ -2,16 +2,16 @@
 /**
  * REST controller.
  *
- * @package SalesByStateReportForSureCart
+ * @package SalesByStateReportForShopify
  */
 
-namespace SBSSC\Api;
+namespace SBSS\Api;
 
-use SBSSC\Data\Backfill;
-use SBSSC\Data\Report;
-use SBSSC\Filters;
-use SBSSC\Install\Schema;
-use SBSSC\Plugin;
+use SBSS\Data\Backfill;
+use SBSS\Data\Report;
+use SBSS\Filters;
+use SBSS\Install\Schema;
+use SBSS\Plugin;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -25,7 +25,7 @@ class Controller extends \WP_REST_Controller {
 	 *
 	 * @var string
 	 */
-	protected $namespace = 'sbssc/v1';
+	protected $namespace = 'sbss/v1';
 
 	/**
 	 * Register hooks.
@@ -122,18 +122,18 @@ class Controller extends \WP_REST_Controller {
 	private function report_args() {
 		return array(
 			'year'     => array(
-				'description' => __( 'Calendar year to report on.', 'sales-by-state-report-for-surecart' ),
+				'description' => __( 'Calendar year to report on.', 'sales-by-state-report-for-shopify' ),
 				'type'        => 'integer',
 				'default'     => Filters::default_year(),
 			),
 			'country'  => array(
-				'description'       => __( 'Two-letter country code.', 'sales-by-state-report-for-surecart' ),
+				'description'       => __( 'Two-letter country code.', 'sales-by-state-report-for-shopify' ),
 				'type'              => 'string',
 				'default'           => Filters::default_country(),
 				'sanitize_callback' => 'sanitize_text_field',
 			),
 			'statuses' => array(
-				'description'       => __( 'Comma-separated order statuses to include.', 'sales-by-state-report-for-surecart' ),
+				'description'       => __( 'Comma-separated order statuses to include.', 'sales-by-state-report-for-shopify' ),
 				'type'              => 'string',
 				'default'           => implode( ',', Filters::default_statuses() ),
 				'sanitize_callback' => 'sanitize_text_field',
@@ -152,8 +152,8 @@ class Controller extends \WP_REST_Controller {
 
 		if ( ! Schema::table_exists() ) {
 			return new \WP_Error(
-				'sbssc_no_table',
-				__( 'The report table could not be created. Check the database user has permission to create tables.', 'sales-by-state-report-for-surecart' ),
+				'sbss_no_table',
+				__( 'The report table could not be created. Check the database user has permission to create tables.', 'sales-by-state-report-for-shopify' ),
 				array( 'status' => 500 )
 			);
 		}
@@ -226,19 +226,19 @@ class Controller extends \WP_REST_Controller {
 
 		$row = array(
 			'state'      => array(
-				'description' => __( 'State code.', 'sales-by-state-report-for-surecart' ),
+				'description' => __( 'State code.', 'sales-by-state-report-for-shopify' ),
 				'type'        => 'string',
 				'context'     => array( 'view' ),
 				'readonly'    => true,
 			),
 			'state_code' => array(
-				'description' => __( 'State code.', 'sales-by-state-report-for-surecart' ),
+				'description' => __( 'State code.', 'sales-by-state-report-for-shopify' ),
 				'type'        => 'string',
 				'context'     => array( 'view' ),
 				'readonly'    => true,
 			),
 			'state_name' => array(
-				'description' => __( 'State name.', 'sales-by-state-report-for-surecart' ),
+				'description' => __( 'State name.', 'sales-by-state-report-for-shopify' ),
 				'type'        => 'string',
 				'context'     => array( 'view' ),
 				'readonly'    => true,
@@ -263,11 +263,11 @@ class Controller extends \WP_REST_Controller {
 
 		$this->schema = array(
 			'$schema'    => 'http://json-schema.org/draft-04/schema#',
-			'title'      => 'sbssc_report',
+			'title'      => 'sbss_report',
 			'type'       => 'object',
 			'properties' => array(
 				'rows'   => array(
-					'description' => __( 'One entry per state.', 'sales-by-state-report-for-surecart' ),
+					'description' => __( 'One entry per state.', 'sales-by-state-report-for-shopify' ),
 					'type'        => 'array',
 					'context'     => array( 'view' ),
 					'readonly'    => true,
@@ -277,13 +277,13 @@ class Controller extends \WP_REST_Controller {
 					),
 				),
 				'totals' => array(
-					'description' => __( 'Totals across every state.', 'sales-by-state-report-for-surecart' ),
+					'description' => __( 'Totals across every state.', 'sales-by-state-report-for-shopify' ),
 					'type'        => 'object',
 					'context'     => array( 'view' ),
 					'readonly'    => true,
 				),
 				'total'  => array(
-					'description' => __( 'Number of states in the result.', 'sales-by-state-report-for-surecart' ),
+					'description' => __( 'Number of states in the result.', 'sales-by-state-report-for-shopify' ),
 					'type'        => 'integer',
 					'context'     => array( 'view' ),
 					'readonly'    => true,

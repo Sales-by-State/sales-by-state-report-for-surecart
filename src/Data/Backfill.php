@@ -1,25 +1,25 @@
 <?php
 /**
- * Populates the report table from existing SureCart orders.
+ * Populates the report table from existing Shopify orders.
  *
- * @package SalesByStateReportForSureCart
+ * @package SalesByStateReportForShopify
  */
 
-namespace SBSSC\Data;
+namespace SBSS\Data;
 
-use SBSSC\Install\Schema;
+use SBSS\Install\Schema;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Walks every order once, test mode then live, one API page at a time.
+ * Walks every order once, one API page at a time.
  */
 class Backfill {
 
 	/**
 	 * Option holding the current API page cursor.
 	 */
-	const CURSOR_OPTION = 'sbssc_backfill_cursor';
+	const CURSOR_OPTION = 'sbss_backfill_cursor';
 
 	/**
 	 * Process one batch.
@@ -27,11 +27,11 @@ class Backfill {
 	 * @param int $limit Orders per batch.
 	 * @return array{processed:int,remaining:int,complete:bool,cursor:array}
 	 */
-	public static function run_batch( $limit = 10 ) {
+	public static function run_batch( $limit = 25 ) {
 		Schema::maybe_install();
 
 		$cursor = self::cursor();
-		$limit  = max( 1, min( 20, (int) $limit ) );
+		$limit  = max( 1, min( 50, (int) $limit ) );
 
 		if ( 'done' === $cursor['phase'] ) {
 			return array(
@@ -42,9 +42,7 @@ class Backfill {
 			);
 		}
 
-		$live   = 'live' === $cursor['phase'];
-		$page   = max( 1, (int) $cursor['page'] );
-		$result = OrderSource::page( $live, $page, $limit );
+		$result = OrderSource::page( (string) $cursor['after'], $limit );
 
 		if ( is_wp_error( $result ) ) {
 			return array(
@@ -56,7 +54,6 @@ class Backfill {
 		}
 
 		$orders = $result['orders'];
-		$total  = (int) $result['count'];
 		$sync   = new Sync();
 		$done   = 0;
 
@@ -67,37 +64,20 @@ class Backfill {
 		}
 
 		$fetched = count( $orders );
-		$seen    = ( ( $page - 1 ) * $limit ) + $fetched;
 
-		if ( 0 === $fetched && $total > $seen ) {
-			return array(
-				'processed' => 0,
-				'remaining' => self::remaining_from( $cursor, $limit ),
-				'complete'  => false,
-				'cursor'    => $cursor,
+		if ( 0 === $fetched || empty( $result['has_next'] ) ) {
+			$cursor = array(
+				'phase' => 'done',
+				'after' => (string) $result['after'],
 			);
-		}
-
-		if ( $fetched < $limit || ( $total && $seen >= $total ) ) {
-			if ( 'test' === $cursor['phase'] ) {
-				$cursor = array(
-					'phase' => 'live',
-					'page'  => 1,
-				);
-			} else {
-				$cursor = array(
-					'phase' => 'done',
-					'page'  => $page,
-				);
-			}
 		} else {
-			$cursor['page'] = $page + 1;
+			$cursor['after'] = (string) $result['after'];
 		}
 
 		update_option( self::CURSOR_OPTION, wp_json_encode( $cursor ), false );
-		delete_transient( 'sbssc_order_count' );
+		delete_transient( 'sbss_order_count' );
 
-		$remaining = self::remaining_from( $cursor, $limit );
+		$remaining = self::remaining_from( $cursor );
 
 		return array(
 			'processed' => $done,
@@ -113,7 +93,7 @@ class Backfill {
 	 * @return int
 	 */
 	public static function remaining() {
-		return self::remaining_from( self::cursor(), 10 );
+		return self::remaining_from( self::cursor() );
 	}
 
 	/**
@@ -134,11 +114,11 @@ class Backfill {
 		Schema::maybe_install();
 		Schema::truncate();
 		delete_option( self::CURSOR_OPTION );
-		delete_transient( 'sbssc_order_count' );
+		delete_transient( 'sbss_order_count' );
 	}
 
 	/**
-	 * Restart the import if it marked itself done without writing any rows.
+	 * Restart the import when the table is empty but the store has orders.
 	 *
 	 * @return void
 	 */
@@ -156,13 +136,13 @@ class Backfill {
 		}
 
 		delete_option( self::CURSOR_OPTION );
-		delete_transient( 'sbssc_order_count' );
+		delete_transient( 'sbss_order_count' );
 	}
 
 	/**
 	 * Current cursor.
 	 *
-	 * @return array{phase:string,page:int}
+	 * @return array{phase:string,after:string}
 	 */
 	private static function cursor() {
 		$raw = get_option( self::CURSOR_OPTION, '' );
@@ -173,16 +153,16 @@ class Backfill {
 			$decoded = json_decode( (string) $raw, true );
 		}
 
-		$phase = isset( $decoded['phase'] ) ? (string) $decoded['phase'] : 'test';
-		$page  = isset( $decoded['page'] ) ? (int) $decoded['page'] : 1;
+		$phase = isset( $decoded['phase'] ) ? (string) $decoded['phase'] : 'page';
+		$after = isset( $decoded['after'] ) ? (string) $decoded['after'] : '';
 
-		if ( ! in_array( $phase, array( 'test', 'live', 'done' ), true ) ) {
-			$phase = 'test';
+		if ( ! in_array( $phase, array( 'page', 'done' ), true ) ) {
+			$phase = 'page';
 		}
 
 		return array(
 			'phase' => $phase,
-			'page'  => max( 1, $page ),
+			'after' => $after,
 		);
 	}
 
@@ -190,23 +170,16 @@ class Backfill {
 	 * Estimate remaining API rows from the cursor.
 	 *
 	 * @param array $cursor Cursor.
-	 * @param int   $limit  Page size.
 	 * @return int
 	 */
-	private static function remaining_from( array $cursor, $limit ) {
+	private static function remaining_from( array $cursor ) {
 		if ( 'done' === $cursor['phase'] ) {
 			return 0;
 		}
 
-		$test = OrderSource::count_mode( false );
-		$live = OrderSource::count_mode( true );
-		$page = max( 1, (int) $cursor['page'] );
-		$seen = ( $page - 1 ) * max( 1, (int) $limit );
+		$total = OrderSource::count();
+		$have  = Schema::row_count();
 
-		if ( 'test' === $cursor['phase'] ) {
-			return max( 0, $test - $seen ) + $live;
-		}
-
-		return max( 0, $live - $seen );
+		return max( 0, $total - $have );
 	}
 }

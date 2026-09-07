@@ -2,25 +2,25 @@
 /**
  * The report page and its assets.
  *
- * @package SalesByStateReportForSureCart
+ * @package SalesByStateReportForShopify
  */
 
-namespace SBSSC\Admin;
+namespace SBSS\Admin;
 
-use SBSSC\Filters;
-use SBSSC\Plugin;
+use SBSS\Filters;
+use SBSS\Plugin;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Registers the report under the SureCart menu.
+ * Registers the report under Shopify.
  */
 class Page {
 
 	/**
 	 * Menu slug.
 	 */
-	const SLUG = 'sbssc-sales-by-state';
+	const SLUG = 'sbss-sales-by-state';
 
 	/**
 	 * Register hooks.
@@ -33,25 +33,16 @@ class Page {
 	}
 
 	/**
-	 * Add the report under SureCart.
-	 *
-	 * Parent slug follows SureCart's own menu: `sc-getting-started` before
-	 * the account is connected, `sc-dashboard` afterwards.
+	 * Add the report under Products.
 	 *
 	 * @return void
 	 */
 	public function register_page() {
-		$parent = 'sc-dashboard';
-
-		if ( class_exists( '\SureCart\Models\ApiToken' ) && ! \SureCart\Models\ApiToken::get() ) {
-			$parent = 'sc-getting-started';
-		}
-
 		add_submenu_page(
-			$parent,
-			__( 'Sales by State', 'sales-by-state-report-for-surecart' ),
-			__( 'Sales by State', 'sales-by-state-report-for-surecart' ),
-			'edit_sc_orders',
+			'shopify',
+			__( 'Sales by State', 'sales-by-state-report-for-shopify' ),
+			__( 'Sales by State', 'sales-by-state-report-for-shopify' ),
+			'manage_options',
 			self::SLUG,
 			array( $this, 'render' )
 		);
@@ -68,11 +59,11 @@ class Page {
 		}
 
 		printf(
-			'<div class="wrap sbssc-wrap">
-				<div class="sbssc-page-header"><h1 class="sbssc-page-header__title">%s</h1></div>
-				<div id="sbssc-root"></div>
+			'<div class="wrap sbss-wrap">
+				<div class="sbss-page-header"><h1 class="sbss-page-header__title">%s</h1></div>
+				<div id="sbss-root"></div>
 			</div>',
-			esc_html__( 'Sales by State', 'sales-by-state-report-for-surecart' )
+			esc_html__( 'Sales by State', 'sales-by-state-report-for-shopify' )
 		);
 	}
 
@@ -87,12 +78,12 @@ class Page {
 			return;
 		}
 
-		$script = SBSSC_DIR . 'assets/js/report.js';
-		$style  = SBSSC_DIR . 'assets/css/report.css';
+		$script = SBSS_DIR . 'assets/js/report.js';
+		$style  = SBSS_DIR . 'assets/css/report.css';
 
 		wp_register_script(
-			'sbssc-report',
-			SBSSC_URL . 'assets/js/report.js',
+			'sbss-report',
+			SBSS_URL . 'assets/js/report.js',
 			array(
 				'wp-hooks',
 				'wp-element',
@@ -101,21 +92,21 @@ class Page {
 				'wp-url',
 				'wp-components',
 			),
-			file_exists( $script ) ? (string) filemtime( $script ) : SBSSC_VERSION,
+			file_exists( $script ) ? (string) filemtime( $script ) : SBSS_VERSION,
 			true
 		);
 
-		wp_set_script_translations( 'sbssc-report', 'sales-by-state-report-for-surecart', SBSSC_DIR . 'languages' );
-		wp_localize_script( 'sbssc-report', 'sbsscConfig', $this->config() );
-		wp_enqueue_script( 'sbssc-report' );
+		wp_set_script_translations( 'sbss-report', 'sales-by-state-report-for-shopify', SBSS_DIR . 'languages' );
+		wp_localize_script( 'sbss-report', 'sbssConfig', $this->config() );
+		wp_enqueue_script( 'sbss-report' );
 
 		wp_enqueue_style( 'wp-components' );
 
 		wp_enqueue_style(
-			'sbssc-report',
-			SBSSC_URL . 'assets/css/report.css',
+			'sbss-report',
+			SBSS_URL . 'assets/css/report.css',
 			array( 'wp-components' ),
-			file_exists( $style ) ? (string) filemtime( $style ) : SBSSC_VERSION
+			file_exists( $style ) ? (string) filemtime( $style ) : SBSS_VERSION
 		);
 	}
 
@@ -188,7 +179,7 @@ class Page {
 			'defaultYear'     => (string) Filters::default_year(),
 			'defaultStatuses' => Filters::default_statuses(),
 			'perPageOptions'  => array( 10, 25, 50, 100 ),
-			'title'           => __( 'Sales by State', 'sales-by-state-report-for-surecart' ),
+			'title'           => __( 'Sales by State', 'sales-by-state-report-for-shopify' ),
 			'canBuild'        => Plugin::can_manage(),
 			'mode'            => 'standalone',
 		);

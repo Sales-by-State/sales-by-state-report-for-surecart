@@ -1,7 +1,7 @@
 /**
- * Sales by State Report for SureCart.
+ * Sales by State Report for Shopify.
  *
- * @package SalesByStateReportForSureCart
+ * @package SalesByStateReportForShopify
  */
 
 ( function ( wp, config ) {
@@ -29,11 +29,11 @@
 	var statusOptions = settings.statuses || [];
 	var perPageOptions = settings.perPageOptions || [ 10, 25, 50, 100 ];
 
-	var API = '/sbssc/v1/report';
-	var DIAGNOSTICS = '/sbssc/v1/diagnostics';
-	var BACKFILL = '/sbssc/v1/backfill';
+	var API = '/sbss/v1/report';
+	var DIAGNOSTICS = '/sbss/v1/diagnostics';
+	var BACKFILL = '/sbss/v1/backfill';
 	var DEFAULT_PER_PAGE = 25;
-	var TEXTDOMAIN = 'sales-by-state-report-for-surecart';
+	var TEXTDOMAIN = 'sales-by-state-report-for-shopify';
 
 	/**
 	 * Chevron used by sort headers and pagination.
@@ -82,7 +82,7 @@
 				'a',
 				{
 					className: 'woocommerce-summary__item',
-					href: '#sbssc-root',
+					href: '#sbss-root',
 					onClick: function ( event ) {
 						event.preventDefault();
 					}
@@ -370,8 +370,8 @@
 		if ( ! diag.table_exists ) {
 			return el(
 				'div',
-				{ className: 'sbssc-notice is-error' },
-				el( 'p', { className: 'sbssc-notice__title' }, __( 'The report table is missing.', TEXTDOMAIN ) ),
+				{ className: 'sbss-notice is-error' },
+				el( 'p', { className: 'sbss-notice__title' }, __( 'The report table is missing.', TEXTDOMAIN ) ),
 				el( 'p', null, __( 'Deactivate and reactivate the plugin to create it. If it still does not appear, the database user may not have permission to create tables.', TEXTDOMAIN ) )
 			);
 		}
@@ -387,21 +387,21 @@
 
 		return el(
 			'div',
-			{ className: 'sbssc-importing', role: 'status', 'aria-live': 'polite' },
+			{ className: 'sbss-importing', role: 'status', 'aria-live': 'polite' },
 			el(
 				'div',
-				{ className: 'sbssc-importing__row' },
-				el( 'span', { className: 'sbssc-importing__label' }, __( 'Reading past orders…', TEXTDOMAIN ) ),
-				el( 'span', { className: 'sbssc-importing__count' }, pct + '%' )
+				{ className: 'sbss-importing__row' },
+				el( 'span', { className: 'sbss-importing__label' }, __( 'Reading past orders…', TEXTDOMAIN ) ),
+				el( 'span', { className: 'sbss-importing__count' }, pct + '%' )
 			),
 			el(
 				'div',
-				{ className: 'sbssc-progress' },
-				el( 'div', { className: 'sbssc-progress__bar', style: { width: pct + '%' } } )
+				{ className: 'sbss-progress' },
+				el( 'div', { className: 'sbss-progress__bar', style: { width: pct + '%' } } )
 			),
 			el(
 				'p',
-				{ className: 'sbssc-importing__hint' },
+				{ className: 'sbss-importing__hint' },
 				__( 'Figures below are incomplete until this finishes.', TEXTDOMAIN )
 			)
 		);
@@ -414,7 +414,7 @@
 	 * @return {Array} Status keys.
 	 */
 	function readStatuses( query ) {
-		var raw = query && query.sbsscStatuses;
+		var raw = query && query.sbssStatuses;
 
 		if ( ! raw ) {
 			return ( settings.defaultStatuses || [ 'paid' ] ).slice();
@@ -542,18 +542,18 @@
 
 		return el(
 			'div',
-			{ className: 'sbssc-filter' },
-			el( 'span', { className: 'sbssc-filter__label' }, __( 'Order status', TEXTDOMAIN ) ),
+			{ className: 'sbss-filter' },
+			el( 'span', { className: 'sbss-filter__label' }, __( 'Order status', TEXTDOMAIN ) ),
 			el( Dropdown, {
-				className: 'sbssc-filter__dropdown',
-				contentClassName: 'sbssc-status-popover',
+				className: 'sbss-filter__dropdown',
+				contentClassName: 'sbss-status-popover',
 				popoverProps: { placement: 'bottom-start' },
 				position: 'bottom left',
 				renderToggle: function ( toggleProps ) {
 					return el(
 						Button,
 						{
-							className: 'sbssc-filter__toggle',
+							className: 'sbss-filter__toggle',
 							onClick: toggleProps.onToggle,
 							'aria-expanded': toggleProps.isOpen
 						},
@@ -563,7 +563,7 @@
 				renderContent: function () {
 					return el(
 						'div',
-						{ className: 'sbssc-status-popover__list' },
+						{ className: 'sbss-status-popover__list' },
 						statusOptions.map( function ( option ) {
 							var checked = selected.indexOf( option.value ) !== -1;
 
@@ -592,12 +592,12 @@
 	function Filter( props ) {
 		return el(
 			'label',
-			{ className: 'sbssc-filter' },
-			el( 'span', { className: 'sbssc-filter__label' }, props.label ),
+			{ className: 'sbss-filter' },
+			el( 'span', { className: 'sbss-filter__label' }, props.label ),
 			el(
 				'select',
 				{
-					className: 'sbssc-filter__select',
+					className: 'sbss-filter__select',
 					value: props.value,
 					onChange: function ( event ) {
 						props.onChange( event.target.value );
@@ -643,8 +643,8 @@
 
 		var started = useRef( false );
 
-		var country = query.sbsscCountry || settings.defaultCountry || 'US';
-		var year = query.sbsscYear || settings.defaultYear;
+		var country = query.sbssCountry || settings.defaultCountry || 'US';
+		var year = query.sbssYear || settings.defaultYear;
 		var statuses = readStatuses( query );
 		var statusKey = statuses.join( ',' );
 
@@ -860,13 +860,13 @@
 			} ),
 			el(
 				'div',
-				{ key: 'filters', className: 'sbssc-filters' },
+				{ key: 'filters', className: 'sbss-filters' },
 				el( Filter, {
 					label: __( 'Country', TEXTDOMAIN ),
 					value: country,
 					options: settings.countries || [],
 					onChange: function ( value ) {
-						setFilter( { sbsscCountry: value } );
+						setFilter( { sbssCountry: value } );
 					}
 				} ),
 				el( Filter, {
@@ -874,13 +874,13 @@
 					value: String( year ),
 					options: settings.years || [],
 					onChange: function ( value ) {
-						setFilter( { sbsscYear: value } );
+						setFilter( { sbssYear: value } );
 					}
 				} ),
 				el( StatusFilter, {
 					value: statuses,
 					onChange: function ( next ) {
-						setFilter( { sbsscStatuses: next.join( ',' ) } );
+						setFilter( { sbssStatuses: next.join( ',' ) } );
 					}
 				} )
 			)
@@ -890,7 +890,7 @@
 			children.push(
 				el(
 					'div',
-					{ key: 'error', className: 'notice notice-error sbssc-error' },
+					{ key: 'error', className: 'notice notice-error sbss-error' },
 					el( 'p', null, data.error )
 				)
 			);
@@ -915,7 +915,7 @@
 			} )
 		);
 
-		return el( 'div', { className: 'woocommerce-analytics__report sbssc-report' }, children );
+		return el( 'div', { className: 'woocommerce-analytics__report sbss-report' }, children );
 	}
 
 	/**
@@ -961,7 +961,7 @@
 	 */
 	function readUrlQuery() {
 		var query = {};
-		var keys = [ 'sbsscCountry', 'sbsscYear', 'sbsscStatuses', 'orderby', 'order', 'paged', 'per_page' ];
+		var keys = [ 'sbssCountry', 'sbssYear', 'sbssStatuses', 'orderby', 'order', 'paged', 'per_page' ];
 		var search = window.location.search.replace( /^\?/, '' );
 		var found = {};
 
@@ -981,7 +981,7 @@
 			}
 		} );
 
-		query.page = found.page || 'sbssc-sales-by-state';
+		query.page = found.page || 'sbss-sales-by-state';
 
 		return query;
 	}
@@ -1008,17 +1008,17 @@
 	 */
 	function mountStandalone() {
 		function render() {
-			var node = document.getElementById( 'sbssc-root' );
+			var node = document.getElementById( 'sbss-root' );
 
 			if ( ! node ) {
 				return;
 			}
 
-			if ( node.getAttribute( 'data-sbssc-mounted' ) ) {
+			if ( node.getAttribute( 'data-sbss-mounted' ) ) {
 				return;
 			}
 
-			node.setAttribute( 'data-sbssc-mounted', '1' );
+			node.setAttribute( 'data-sbss-mounted', '1' );
 
 			if ( wp.element.createRoot ) {
 				wp.element.createRoot( node ).render( el( StandaloneReport ) );
@@ -1037,4 +1037,4 @@
 	}
 
 	mountStandalone();
-} )( window.wp, window.sbsscConfig );
+} )( window.wp, window.sbssConfig );

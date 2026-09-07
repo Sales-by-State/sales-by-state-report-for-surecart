@@ -2,13 +2,12 @@
 /**
  * The report query.
  *
- * @package SalesByStateReportForSureCart
+ * @package SalesByStateReportForShopify
  */
 
-namespace SBSSC\Data;
+namespace SBSS\Data;
 
-use SBSSC\Filters;
-use SureCart\Support\Currency;
+use SBSS\Filters;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -69,7 +68,7 @@ class Report {
 				        status,
 				        SUM( net_total ) AS net_revenue,
 				        SUM( total_sales ) AS gross_revenue
-				 FROM {$wpdb->prefix}sbssc_order_state
+				 FROM {$wpdb->prefix}sbss_order_state
 				 WHERE shipping_country = %s
 				   AND COALESCE( date_paid, date_created ) >= %s
 				   AND COALESCE( date_paid, date_created ) <= %s
@@ -175,7 +174,7 @@ class Report {
 			$rows[ $index ]['state_code'] = $code;
 			$rows[ $index ]['state_name'] = isset( $state_names[ $code ] ) && $state_names[ $code ]
 				? $state_names[ $code ]
-				: ( '' === $code ? __( 'Unknown', 'sales-by-state-report-for-surecart' ) : $code );
+				: ( '' === $code ? __( 'Unknown', 'sales-by-state-report-for-shopify' ) : $code );
 
 			foreach ( Filters::measure_keys() as $key ) {
 				$amount                                = round( (float) $row[ $key ], 2 );
@@ -217,14 +216,85 @@ class Report {
 	 * @return string
 	 */
 	private function money( $amount ) {
-		$cents = (int) round( (float) $amount * 100 );
+		$amount = (float) $amount;
+		$meta   = $this->currency_meta();
+		$number = number_format_i18n( $amount, $meta['decimals'] );
 
-		if ( class_exists( Currency::class ) ) {
-			$formatted = Currency::format( $cents, null, array( 'convert' => false ) );
-
-			return html_entity_decode( wp_strip_all_tags( (string) $formatted ), ENT_QUOTES, 'UTF-8' );
+		if ( '' === $meta['symbol'] ) {
+			return $number;
 		}
 
-		return '$' . number_format( (float) $amount, 2 );
+		if ( 'left+space' === $meta['position'] ) {
+			return $meta['symbol'] . ' ' . $number;
+		}
+
+		if ( 'right' === $meta['position'] ) {
+			return $number . $meta['symbol'];
+		}
+
+		if ( 'right+space' === $meta['position'] ) {
+			return $number . ' ' . $meta['symbol'];
+		}
+
+		return $meta['symbol'] . $number;
+	}
+
+	/**
+	 * Currency symbol and position from Shopify settings, with a table fallback.
+	 *
+	 * @return array{symbol:string,position:string,decimals:int}
+	 */
+	private function currency_meta() {
+		static $meta = null;
+
+		if ( is_array( $meta ) ) {
+			return $meta;
+		}
+
+		$symbol   = '$';
+		$position = 'left';
+		$code     = '';
+		$decimals = 2;
+
+		if ( '' === $code ) {
+			$cached = get_transient( 'sbss_currency_code' );
+
+			if ( is_string( $cached ) && preg_match( '/^[A-Z]{3}$/', $cached ) ) {
+				$code = $cached;
+			} else {
+				global $wpdb;
+
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+				$from_table = strtoupper( (string) $wpdb->get_var( "SELECT currency FROM {$wpdb->prefix}sbss_order_state WHERE currency <> '' LIMIT 1" ) );
+
+				if ( preg_match( '/^[A-Z]{3}$/', $from_table ) ) {
+					$code = $from_table;
+					set_transient( 'sbss_currency_code', $code, DAY_IN_SECONDS );
+				}
+			}
+		}
+
+		if ( preg_match( '/^[A-Z]{3}$/', $code ) ) {
+			$symbols = array(
+				'USD' => '$',
+				'CAD' => '$',
+				'GBP' => '£',
+			);
+
+			if ( isset( $symbols[ $code ] ) ) {
+				$symbol = $symbols[ $code ];
+			} else {
+				$symbol   = $code;
+				$position = 'left+space';
+			}
+		}
+
+		$meta = array(
+			'symbol'   => $symbol,
+			'position' => $position,
+			'decimals' => max( 0, $decimals ),
+		);
+
+		return $meta;
 	}
 }

@@ -2,12 +2,12 @@
 /**
  * Report table schema.
  *
- * @package SalesByStateReportForSureCart
+ * @package SalesByStateReportForShopify
  */
 
-namespace SBSSC\Install;
+namespace SBSS\Install;
 
-use SBSSC\Data\OrderSource;
+use SBSS\Data\OrderSource;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -23,12 +23,12 @@ class Schema {
 	/**
 	 * Schema version. Bump when the table definition changes.
 	 */
-	const DB_VERSION = 2;
+	const DB_VERSION = 1;
 
 	/**
 	 * Option holding the installed schema version.
 	 */
-	const VERSION_OPTION = 'sbssc_db_version';
+	const VERSION_OPTION = 'sbss_db_version';
 
 	/**
 	 * Fully qualified table name.
@@ -38,7 +38,7 @@ class Schema {
 	public static function table() {
 		global $wpdb;
 
-		return $wpdb->prefix . 'sbssc_order_state';
+		return $wpdb->prefix . 'sbss_order_state';
 	}
 
 	/**
@@ -64,7 +64,6 @@ class Schema {
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
-		$from    = (int) get_option( self::VERSION_OPTION, 0 );
 		$table   = self::table();
 		$collate = $wpdb->has_cap( 'collation' ) ? $wpdb->get_charset_collate() : '';
 
@@ -95,17 +94,6 @@ class Schema {
 			return;
 		}
 
-		$rows = self::row_count();
-
-		if ( 0 === $rows || ( $from > 0 && $from < 2 ) ) {
-			if ( $from > 0 && $from < 2 && $rows > 0 ) {
-				self::truncate();
-			}
-
-			delete_option( 'sbssc_backfill_cursor' );
-			delete_transient( 'sbssc_order_count' );
-		}
-
 		update_option( self::VERSION_OPTION, self::DB_VERSION, false );
 	}
 
@@ -119,7 +107,7 @@ class Schema {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return (bool) $wpdb->get_var(
-			$wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->prefix . 'sbssc_order_state' )
+			$wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->prefix . 'sbss_order_state' )
 		);
 	}
 
@@ -136,11 +124,11 @@ class Schema {
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}sbssc_order_state" );
+		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}sbss_order_state" );
 	}
 
 	/**
-	 * Row count alongside the number of orders on the SureCart account.
+	 * Row count alongside the number of orders on the Shopify account.
 	 *
 	 * @return array{rows:int,orders:int}
 	 */
@@ -160,6 +148,6 @@ class Schema {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
-		$wpdb->query( "TRUNCATE TABLE {$wpdb->prefix}sbssc_order_state" );
+		$wpdb->query( "TRUNCATE TABLE {$wpdb->prefix}sbss_order_state" );
 	}
 }
