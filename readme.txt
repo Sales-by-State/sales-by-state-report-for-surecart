@@ -5,7 +5,7 @@ Tags: sales-report, sales-by-state, surecart, analytics, sales-tax
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -13,15 +13,24 @@ See a yearly breakdown of SureCart sales by state / county / province for a give
 
 == Description ==
 
-Sales by State Report for SureCart adds a report showing net and gross sales grouped by state, county or province, for a chosen year and a chosen set of order statuses.
+Sales by State Report for SureCart adds a report showing net and gross sales grouped by state, county, or province, for a chosen year and a chosen set of order statuses.
 
 It appears under **SureCart → Sales by State**.
 
-It answers the question sales tax and territory planning actually ask: how much did each state buy in a given year, counting only the orders that matter.
+Use it when you need to know how much each state bought in a given year, counting only the order statuses that matter for sales tax or territory planning.
 
-This plugin requires [SureCart](https://wordpress.org/plugins/surecart/).
+This plugin requires [SureCart](https://wordpress.org/plugins/surecart/). There are no settings screens to configure. After you activate the plugin, open the report and choose a country, year, and order statuses.
 
 Documentation: [salesbystate.com](https://salesbystate.com/)
+
+= How to use =
+
+1. Install and activate SureCart, then install and activate this plugin.
+2. Go to **SureCart → Sales by State**.
+3. Choose a **country**, a **year**, and the **order statuses** that should count.
+4. The table lists Net Sales and Gross Sales for every state in that country.
+
+If the store already has orders, the plugin imports them from the SureCart API into its report table in the background. A progress bar appears until that finishes. You can leave the page; the import continues on its own.
 
 = What the report shows =
 
@@ -100,24 +109,10 @@ Use the [WordPress.org support forum](https://wordpress.org/support/plugin/sales
 
 == Changelog ==
 
-= 1.1.0 =
-* Align capabilities, menu and enqueue with SureCart's admin add-on pattern.
-* Use invoice issue date for the year filter when the checkout belongs to an invoice.
-* Add a Site Health info section for the report table.
-
-= 1.0.1 =
-* Import existing SureCart orders into the report table. A PHP empty() check on SureCart collections skipped every page.
-
 = 1.0.0 =
 * Initial release.
 
 == Upgrade Notice ==
-
-= 1.1.0 =
-Uses SureCart shop capabilities for the report, and invoice issue date for the year filter when present.
-
-= 1.0.1 =
-Fixes the empty report after importing existing orders.
 
 = 1.0.0 =
 Initial release.

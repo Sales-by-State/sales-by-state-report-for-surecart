@@ -110,9 +110,6 @@ class OrderSource {
 	/**
 	 * Orders on a SureCart Collection.
 	 *
-	 * Read `$result->data` directly. `empty()` is unreliable on Collection
-	 * because the property is exposed through `__get()` without `__isset()`.
-	 *
 	 * @param mixed $result Paginate result.
 	 * @return array
 	 */

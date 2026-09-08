@@ -11,9 +11,6 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * US, Canada, and UK subdivisions.
- *
- * SureCart does not ship a WooCommerce-style locale helper, so the codes
- * the report fills in as zero-sales rows are listed here.
  */
 class Regions {
 
