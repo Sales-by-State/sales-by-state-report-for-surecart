@@ -140,8 +140,8 @@ class Sync {
 			$shipping_state   = $billing_state;
 		}
 
-		$total    = self::from_cents( $checkout->total_amount ?? 0, $checkout );
-		$tax      = self::from_cents( $checkout->tax_amount ?? 0, $checkout );
+		$total          = self::from_cents( $checkout->total_amount ?? 0, $checkout );
+		$tax            = self::from_cents( $checkout->tax_amount ?? 0, $checkout );
 		$shipping_total = self::from_cents( $checkout->shipping_amount ?? 0, $checkout );
 
 		if ( $tax <= 0 ) {
@@ -213,7 +213,7 @@ class Sync {
 		$checkout = $order->checkout ?? null;
 
 		if ( is_string( $checkout ) && $checkout && class_exists( Checkout::class ) ) {
-			$loaded = Checkout::with( array( 'shipping_address', 'billing_address', 'invoice' ) )->find( $checkout );
+			$loaded   = Checkout::with( array( 'shipping_address', 'billing_address', 'invoice' ) )->find( $checkout );
 			$checkout = is_wp_error( $loaded ) ? null : $loaded;
 		}
 
