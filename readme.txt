@@ -5,7 +5,7 @@ Tags: sales-report, sales-by-state, surecart, analytics, sales-tax
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -109,10 +109,16 @@ Use the [WordPress.org support forum](https://wordpress.org/support/plugin/sales
 
 == Changelog ==
 
+= 1.0.1 =
+* Code style cleanup, no functional change. Fixed WP.org listing banner.
+
 = 1.0.0 =
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.1 =
+Code style cleanup, no functional change.
 
 = 1.0.0 =
 Initial release.

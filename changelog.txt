@@ -1,4 +1,8 @@
 *** Sales by State Report for SureCart Changelog ***
 
+2026-09-09 - version 1.0.1
+* Code style cleanup, no functional change.
+* Fixed WP.org listing banner.
+
 2026-09-06 - version 1.0.0
 * Initial release.
