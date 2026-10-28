@@ -1,5 +1,9 @@
 *** Sales by State Report for SureCart Changelog ***
 
+2026-10-28 - version 1.0.2
+* Tweak: removed a leftover WooCommerce class from the report screen.
+* New WordPress.org banner.
+
 2026-09-09 - version 1.0.1
 * Code style cleanup, no functional change.
 * Fixed WP.org listing banner.
