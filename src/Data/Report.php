@@ -219,8 +219,14 @@ class Report {
 	private function money( $amount ) {
 		$cents = (int) round( (float) $amount * 100 );
 
-		if ( class_exists( Currency::class ) ) {
-			$formatted = Currency::format( $cents, null, array( 'convert' => false ) );
+		// A store not connected to SureCart yet has no account currency, and SureCart's
+		// formatter then passes null to strtoupper() (deprecated since PHP 8.1).
+		$currency = class_exists( Currency::class ) && method_exists( Currency::class, 'getDefaultCurrency' )
+			? (string) Currency::getDefaultCurrency()
+			: '';
+
+		if ( '' !== $currency ) {
+			$formatted = Currency::format( $cents, $currency, array( 'convert' => false ) );
 
 			return html_entity_decode( wp_strip_all_tags( (string) $formatted ), ENT_QUOTES, 'UTF-8' );
 		}
